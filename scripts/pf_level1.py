@@ -320,11 +320,11 @@ class ParticleFilter:
 		weightArray = np.empty([numParticles, 1])
 		for i in range(numParticles):
 			numParticles.add[i]=self.particle_cloud[i].w
-		print weightArray
+		print "Sum of initial weights" + str(np.sum(weightArray))
 		normWeights = weightArray/np.sum(weightArray)
 		for i in range(numParticles):
 			self.particle_cloud[i].w = normWeights[i]
-		print np.sum(normWeights)
+		print "Sum of normalized weights" + str(np.sum(normWeights))
 
 
 	def publish_particles(self, msg):
