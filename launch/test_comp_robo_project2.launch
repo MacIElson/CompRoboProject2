@@ -4,5 +4,5 @@
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
 
   <!-- Localization -->
-  <node name="comp_pobo_project2" pkg="comp_robo_project2" type="pf.py" output="screen"/>
+  <node name="comp_robo_project2" pkg="comp_robo_project2" type="pf_level1.py" output="screen"/>
 </launch>
