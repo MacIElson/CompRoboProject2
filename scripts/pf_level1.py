@@ -316,6 +316,16 @@ class ParticleFilter:
 	def normalize_particles(self):
 		""" Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
 		# TODO: implement this
+		numParticles = len(self.particle_cloud)
+		weightArray = np.empty([numParticles, 1])
+		for i in range(numParticles):
+			numParticles.add[i]=self.particle_cloud[i].w
+		print weightArray
+		normWeights = weightArray/np.sum(weightArray)
+		for i in range(numParticles):
+			self.particle_cloud[i].w = normWeights[i]
+		print np.sum(normWeights)
+
 
 	def publish_particles(self, msg):
 		particles_conv = []
