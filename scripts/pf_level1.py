@@ -91,7 +91,6 @@ class OccupancyField:
 	"""
 
 	def __init__(self, map):
-		print "OccupancyField initializing"
 		self.map = map		# save this for later
 		# build up a numpy array of the coordinates of each grid cell in the map
 		X = np.zeros((self.map.info.width*self.map.info.height,2))
@@ -108,8 +107,6 @@ class OccupancyField:
 				X[curr,0] = float(i)
 				X[curr,1] = float(j)
 				curr += 1
-
-		print total_occupied
 
 		# build up a numpy array of the coordinates of each occupied grid cell in the map
 		O = np.zeros((total_occupied,2))
@@ -132,9 +129,8 @@ class OccupancyField:
 		for i in range(self.map.info.width):
 			for j in range(self.map.info.height):
 				ind = i + j*self.map.info.width
-				self.closest_occ[ind] = distances[curr]*self.map.info.resolution
+				self.closest_occ[ind] = distances[curr][0]*self.map.info.resolution
 				curr += 1
-		print "OccupancyField initialized"
 
 	def get_closest_obstacle_distance(self,x,y):
 		""" Compute the closest obstacle to the specified (x,y) coordinate in the map.  If the (x,y) coordinate
@@ -246,7 +242,13 @@ class ParticleFilter:
 		self.robot_pose = Pose()
 
 	def update_particles_with_odom(self, msg):
-		""" Implement a simple version of this (Level 1) or a more complex one (Level 2) """
+		""" Update the particles using the newly given odometry pose.
+			The function computes the value delta which is a tuple (x,y,theta)
+			that indicates the change in position and angle between the odometry
+			when the particles were last updated and the current odometry.
+
+			msg: this is not really needed to implement this, but is here just in case.
+		"""
 		new_odom_xy_theta = TransformHelpers.convert_pose_to_xy_and_theta(self.odom_pose.pose)
 		# compute the change in x,y,theta since our last update
 		if self.current_odom_xy_theta:
@@ -266,7 +268,11 @@ class ParticleFilter:
 		pass
 
 	def resample_particles(self):
-		""" Resample the particles according to the new particle weights """
+		""" Resample the particles according to the new particle weights.
+			The weights stored with each particle should define the probability that a particular
+			particle is selected in the resampling step.  You may want to make use of the given helper
+			function draw_random_sample.
+		"""
 		# make sure the distribution is normalized
 		self.normalize_particles()
 		# TODO: fill out the rest of the implementation
@@ -310,6 +316,22 @@ class ParticleFilter:
 		"""
 		bins = np.add.accumulate(probabilities)
 		return values[np.digitize(random_sample(size), bins)]
+
+	@staticmethod
+	def draw_random_sample(choices, probabilities, n):
+		""" Return a random sample of n elements from the set choices with the specified probabilities
+			choices: the values to sample from represented as a list
+			probabilities: the probability of selecting each element in choices represented as a list
+			n: the number of samples
+		"""
+		values = np.array(range(len(choices)))
+		probs = np.array(probabilities)
+		bins = np.add.accumulate(probs)
+		inds = values[np.digitize(random_sample(n), bins)]
+		samples = []
+		for i in inds:
+			samples.append(choices[int(i)])
+		return samples
 
 	def update_initial_pose(self, msg):
 		""" Callback function to handle re-initializing the particle filter based on a pose estimate.
