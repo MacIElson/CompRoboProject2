@@ -328,24 +328,24 @@ class ParticleFilter:
 			res = self.occupancy_field.map.info.resolution
 			width = self.occupancy_field.map.info.width
 			height = self.occupancy_field.map.info.height
-			for i in self.n_particles = 300:
-				self.particle_cloud[i] = random.uniform(0,)
+			# Assues origin is in bottom left
+			for i in self.n_particles:
+				x = int(random.uniform(0,width)) *  res # scalsed to real-wold values
+				y = int(random.uniform(0,height)) * res
+				theta = random.uniform(0,2*math.pi)
+				rand_particle = Particle(x = x, y = y, theta =  theta)
+				self.particle_cloud[i] = rand_particle
 		else:
-			for i in self.n_particles = 300:
-				self.particle_cloud[i] = [random.gauss(xy_theta[0], 1), (random.gauss(xy_theta[1], 1), (random.gauss(xy_theta[2], 1.5)]
-			
-
-		random.gauss(, sigma)
-
-		random.gauss(mu, sigma)
-
+			for i in self.n_particles:
+				x = random.gauss(xy_theta[0], 1)
+				y = random.gauss(xy_theta[1], 1)
+				theta = (random.gauss(xy_theta[2], 1.5))
+				rand_particle = Particle(x = x, y = y, theta =  theta)
+				self.particle_cloud[i] = rand_particle
 
 		# Get map characteristics to generate points randomly in that realm. Assume
-
-		self.occupancy_field.map.info.width
-		self.occupancy_field.map.info.height
 		# TODO create particles
-
+		self.particle_pub.publish(self.particle_cloud)
 		self.normalize_particles()
 		self.update_robot_pose()
 
