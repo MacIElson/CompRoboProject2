@@ -211,8 +211,10 @@ class ParticleFilter:
 		#		into the init method for OccupancyField
 		
 		# for now we have commented out the occupancy field initialization until you can successfully fetch the map
-		#self.occupancy_field = OccupancyField(map)
+		self.occupancy_field = OccupancyField(map)
 		self.initialized = True
+
+
 
 	def update_robot_pose(self):
 		""" Update the estimate of the robot's pose given the updated particles.
@@ -269,8 +271,8 @@ class ParticleFilter:
 			the difference is always based on the closest rotation from angle a to angle b
 			examples:
 				angle_diff(.1,.2) -> -.1
-				angle_diff(.1, 2*math.pi - .1) -> .2
-				angle_diff(.1, .2+2*math.pi) -> -.1
+				angle_diff(.1,2*math.pi-.1) -> .2
+				angle_diff(.1,.2+2*math.pi) -> -.1
 		"""
 		a = ParticleFilter.angle_normalize(a)
 		b = ParticleFilter.angle_normalize(b)
@@ -305,9 +307,32 @@ class ParticleFilter:
 			Arguments
 			xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
 					  particle cloud around.  If this input is ommitted, the odometry will be used """
-		if xy_theta == None:
-			xy_theta = TransformHelpers.convert_pose_to_xy_and_theta(self.odom_pose.pose)
+		
+		# Evenly distributed field if no intial guess is given
 		self.particle_cloud = []
+
+
+		if xy_theta == None:
+			# xy_theta = TransformHelpers.convert_pose_to_xy_and_theta(self.odom_pose.pose)
+			res = self.occupancy_field.map.info.resolution
+			width = self.occupancy_field.map.info.width
+			height = self.occupancy_field.map.info.height
+			for i in self.n_particles = 300:
+				self.particle_cloud[i] = random.uniform(0,)
+		else:
+			for i in self.n_particles = 300:
+				self.particle_cloud[i] = [random.gauss(xy_theta[0], 1), (random.gauss(xy_theta[1], 1), (random.gauss(xy_theta[2], 1.5)]
+			
+
+		random.gauss(, sigma)
+
+		random.gauss(mu, sigma)
+
+
+		# Get map characteristics to generate points randomly in that realm. Assume
+
+		self.occupancy_field.map.info.width
+		self.occupancy_field.map.info.height
 		# TODO create particles
 
 		self.normalize_particles()
@@ -325,7 +350,6 @@ class ParticleFilter:
 		for i in range(numParticles):
 			self.particle_cloud[i].w = normWeights[i]
 		print "Sum of normalized weights" + str(np.sum(normWeights))
-
 
 	def publish_particles(self, msg):
 		particles_conv = []
