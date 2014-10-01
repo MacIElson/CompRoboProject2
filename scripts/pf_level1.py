@@ -204,9 +204,9 @@ class ParticleFilter:
 		self.tf_listener = TransformListener()
 		self.tf_broadcaster = TransformBroadcaster()
 
-		self.particle_cloud = []
+		#self.particle_cloud = []
 
-		self.current_odom_xy_theta = []
+		#self.current_odom_xy_theta = [0,0,0]
 
 		# request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
 		# TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
@@ -214,12 +214,12 @@ class ParticleFilter:
 
 		print "waiting for map server"
 		rospy.wait_for_service('static_map')
-		print "have static_map"
+		print "static_map service loaded"
 		static_map = rospy.ServiceProxy('static_map', GetMap)
 		worldMap = static_map()
 
 		if worldMap:
-			print "have map"
+			print "obtained map"
 
 		# for now we have commented out the occupancy field initialization until you can successfully fetch the map
 		self.occupancy_field = OccupancyField(worldMap.map)
@@ -376,7 +376,7 @@ class ParticleFilter:
 
 		# Get map characteristics to generate points randomly in that realm. Assume
 		# TODO create particles
-		self.particle_pub.publish(self.particle_cloud)
+		self.particle_pub.publish()
 		self.normalize_particles()
 		self.update_robot_pose()
 		print "particle cloud initialized"
@@ -387,7 +387,7 @@ class ParticleFilter:
 		numParticles = len(self.particle_cloud)
 		weightArray = np.empty([numParticles, 1])
 		for i in range(numParticles):
-			numParticles.add[i]=self.particle_cloud[i].w
+			weightArray[i]=self.particle_cloud[i].w
 		print "Sum of initial weights" + str(np.sum(weightArray))
 		normWeights = weightArray/np.sum(weightArray)
 		for i in range(numParticles):
@@ -404,6 +404,7 @@ class ParticleFilter:
 	def scan_received(self, msg):
 		""" This is the default logic for what to do when processing scan data.  Feel free to modify this, however,
 			I hope it will provide a good guide.  The input msg is an object of type sensor_msgs/LaserScan """
+		print "scan received"
 		if not(self.initialized):
 			# wait for initialization to complete
 			return
@@ -428,22 +429,34 @@ class ParticleFilter:
 		# store the the odometry pose in a more convenient format (x,y,theta)
 		new_odom_xy_theta = TransformHelpers.convert_pose_to_xy_and_theta(self.odom_pose.pose)
 
-		if not(self.particle_cloud):
+		# try:
+		# 	self.current_odom_xy_theta
+		# except:
+		# 	self.current_odom_xy_theta = new_odom_xy_theta
+
+		# print new_odom_xy_theta
+
+		# print self.current_odom_xy_theta
+
+		try:
+			self.particle_cloud
+			if (math.fabs(new_odom_xy_theta[0] - self.current_odom_xy_theta[0]) > self.d_thresh or
+				  math.fabs(new_odom_xy_theta[1] - self.current_odom_xy_theta[1]) > self.d_thresh or
+				  math.fabs(new_odom_xy_theta[2] - self.current_odom_xy_theta[2]) > self.a_thresh):
+				# we have moved far enough to do an update!
+				self.update_particles_with_odom(msg)	# update based on odometry
+				self.update_particles_with_laser(msg)	# update based on laser scan
+				self.update_robot_pose()				# update robot's pose
+				self.resample_particles()				# resample particles to focus on areas of high density
+				self.fix_map_to_odom_transform(msg)		# update map to odom transform now that we have new particles
+		except:
 			# now that we have all of the necessary transforms we can update the particle cloud
 			self.initialize_particle_cloud()
 			# cache the last odometric pose so we can only update our particle filter if we move more than self.d_thresh or self.a_thresh
 			self.current_odom_xy_theta = new_odom_xy_theta
 			# update our map to odom transform now that the particles are initialized
 			self.fix_map_to_odom_transform(msg)
-		elif (math.fabs(new_odom_xy_theta[0] - self.current_odom_xy_theta[0]) > self.d_thresh or
-			  math.fabs(new_odom_xy_theta[1] - self.current_odom_xy_theta[1]) > self.d_thresh or
-			  math.fabs(new_odom_xy_theta[2] - self.current_odom_xy_theta[2]) > self.a_thresh):
-			# we have moved far enough to do an update!
-			self.update_particles_with_odom(msg)	# update based on odometry
-			self.update_particles_with_laser(msg)	# update based on laser scan
-			self.update_robot_pose()				# update robot's pose
-			self.resample_particles()				# resample particles to focus on areas of high density
-			self.fix_map_to_odom_transform(msg)		# update map to odom transform now that we have new particles
+
 		# publish particles (so things like rviz can see them)
 		self.publish_particles(msg)
 
