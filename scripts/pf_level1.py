@@ -15,6 +15,7 @@ from random import gauss
 
 import math
 import time
+import random
 
 import numpy as np
 from numpy.random import random_sample
@@ -90,6 +91,7 @@ class OccupancyField:
 	"""
 
 	def __init__(self, map):
+		print "OccupancyField initializing"
 		self.map = map		# save this for later
 		# build up a numpy array of the coordinates of each grid cell in the map
 		X = np.zeros((self.map.info.width*self.map.info.height,2))
@@ -132,6 +134,7 @@ class OccupancyField:
 				ind = i + j*self.map.info.width
 				self.closest_occ[ind] = distances[curr]*self.map.info.resolution
 				curr += 1
+		print "OccupancyField initialized"
 
 	def get_closest_obstacle_distance(self,x,y):
 		""" Compute the closest obstacle to the specified (x,y) coordinate in the map.  If the (x,y) coordinate
@@ -173,6 +176,7 @@ class ParticleFilter:
 			map: the map we will be localizing ourselves in.  The map should be of type nav_msgs/OccupancyGrid
 	"""
 	def __init__(self):
+		print "ParticleFilter initializing "
 		self.initialized = False		# make sure we don't perform updates before everything is setup
 		rospy.init_node('comp_robo_project2')			# tell roscore that we are creating a new node named "pf"
 
@@ -224,6 +228,7 @@ class ParticleFilter:
 		# for now we have commented out the occupancy field initialization until you can successfully fetch the map
 		self.occupancy_field = OccupancyField(worldMap.map)
 		self.initialized = True
+		print "ParticleFilter initialized"
 
 
 
@@ -319,35 +324,40 @@ class ParticleFilter:
 			xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
 					  particle cloud around.  If this input is ommitted, the odometry will be used """
 		
+		print "initializing particle cloud"
 		# Evenly distributed field if no intial guess is given
 		self.particle_cloud = []
 
 
 		if xy_theta == None:
+			print "no guess given"
 			# xy_theta = TransformHelpers.convert_pose_to_xy_and_theta(self.odom_pose.pose)
 			res = self.occupancy_field.map.info.resolution
 			width = self.occupancy_field.map.info.width
 			height = self.occupancy_field.map.info.height
 			# Assues origin is in bottom left
-			for i in self.n_particles:
+			for i in range(self.n_particles):
 				x = int(random.uniform(0,width)) *  res # scalsed to real-wold values
 				y = int(random.uniform(0,height)) * res
 				theta = random.uniform(0,2*math.pi)
 				rand_particle = Particle(x = x, y = y, theta =  theta)
-				self.particle_cloud[i] = rand_particle
+				self.particle_cloud.append(rand_particle)
 		else:
-			for i in self.n_particles:
+			print "guess given"
+			print xy_theta
+			for i in range(self.n_particles):
 				x = random.gauss(xy_theta[0], 1)
 				y = random.gauss(xy_theta[1], 1)
 				theta = (random.gauss(xy_theta[2], 1.5))
 				rand_particle = Particle(x = x, y = y, theta =  theta)
-				self.particle_cloud[i] = rand_particle
+				self.particle_cloud.append(rand_particle)
 
 		# Get map characteristics to generate points randomly in that realm. Assume
 		# TODO create particles
 		self.particle_pub.publish(self.particle_cloud)
 		self.normalize_particles()
 		self.update_robot_pose()
+		print "particle cloud initialized"
 
 	def normalize_particles(self):
 		""" Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
