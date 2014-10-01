@@ -107,6 +107,8 @@ class OccupancyField:
 				X[curr,1] = float(j)
 				curr += 1
 
+		print total_occupied
+
 		# build up a numpy array of the coordinates of each occupied grid cell in the map
 		O = np.zeros((total_occupied,2))
 		curr = 0
@@ -172,14 +174,14 @@ class ParticleFilter:
 	"""
 	def __init__(self):
 		self.initialized = False		# make sure we don't perform updates before everything is setup
-		rospy.init_node('pf')			# tell roscore that we are creating a new node named "pf"
+		rospy.init_node('comp_robo_project2')			# tell roscore that we are creating a new node named "pf"
 
 		self.base_frame = "base_link"	# the frame of the robot base
 		self.map_frame = "map"			# the name of the map coordinate frame
 		self.odom_frame = "odom"		# the name of the odometry coordinate frame
 		self.scan_topic = "scan"		# the topic where we will get laser scans from 
 
-		self.n_particles = 300			# the number of particles to use
+		self.n_particles = 300			# the number of paporticles to use
 
 		self.d_thresh = 0.2				# the amount of linear movement before performing an update
 		self.a_thresh = math.pi/6		# the amount of angular movement before performing an update
@@ -209,9 +211,18 @@ class ParticleFilter:
 		# request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
 		# TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
 		#		into the init method for OccupancyField
-		
+
+		print "waiting for map server"
+		rospy.wait_for_service('static_map')
+		print "have static_map"
+		static_map = rospy.ServiceProxy('static_map', GetMap)
+		worldMap = static_map()
+
+		if worldMap:
+			print "have map"
+
 		# for now we have commented out the occupancy field initialization until you can successfully fetch the map
-		self.occupancy_field = OccupancyField(map)
+		self.occupancy_field = OccupancyField(worldMap.map)
 		self.initialized = True
 
 
@@ -419,6 +430,7 @@ class ParticleFilter:
 		self.tf_broadcaster.sendTransform(self.translation, self.rotation, rospy.get_rostime(), self.odom_frame, self.map_frame)
 
 if __name__ == '__main__':
+	print "starting"
 	n = ParticleFilter()
 	r = rospy.Rate(5)
 
