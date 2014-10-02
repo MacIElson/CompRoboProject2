@@ -91,6 +91,7 @@ class OccupancyField:
 	"""
 
 	def __init__(self, map):
+		print "OccupancyField initializing"
 		self.map = map		# save this for later
 		# build up a numpy array of the coordinates of each grid cell in the map
 		X = np.zeros((self.map.info.width*self.map.info.height,2))
@@ -131,6 +132,8 @@ class OccupancyField:
 				ind = i + j*self.map.info.width
 				self.closest_occ[ind] = distances[curr][0]*self.map.info.resolution
 				curr += 1
+
+		print "OccupancyField initialized"
 
 	def get_closest_obstacle_distance(self,x,y):
 		""" Compute the closest obstacle to the specified (x,y) coordinate in the map.  If the (x,y) coordinate
@@ -407,6 +410,7 @@ class ParticleFilter:
 		print "scan received"
 		if not(self.initialized):
 			# wait for initialization to complete
+			print "not initialized"
 			return
 
 		if not(self.tf_listener.canTransform(self.base_frame,msg.header.frame_id,msg.header.stamp)):
