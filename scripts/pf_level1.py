@@ -99,12 +99,15 @@ class OccupancyField:
 		# while we're at it let's count the number of occupied cells
 		total_occupied = 0
 		curr = 0
+		self.unoccupied_cells = []
 		for i in range(self.map.info.width):
 			for j in range(self.map.info.height):
 				# occupancy grids are stored in row major order, if you go through this right, you might be able to use curr
 				ind = i + j*self.map.info.width
 				if self.map.data[ind] > 0:
 					total_occupied += 1
+				elif self.map.data[ind] == 0:
+					self.unoccupied_cells.append([i,j])
 				X[curr,0] = float(i)
 				X[curr,1] = float(j)
 				curr += 1
@@ -353,20 +356,20 @@ class ParticleFilter:
 		# Evenly distributed field if no intial guess is given
 		self.particle_cloud = []
 
+		unoccupied_cells = self.occupancy_field.unoccupied_cells
+		print unoccupied_cells
 
 		if xy_theta == None:
 			print "no guess given"
-			# xy_theta = TransformHelpers.convert_pose_to_xy_and_theta(self.odom_pose.pose)
+			random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
 			res = self.occupancy_field.map.info.resolution
-			width = self.occupancy_field.map.info.width
-			height = self.occupancy_field.map.info.height
-			# Assues origin is in bottom left
-			for i in range(self.n_particles):
-				x = int(random.uniform(0,width)) *  res # scalsed to real-wold values
-				y = int(random.uniform(0,height)) * res
-				theta = random.uniform(0,2*math.pi)
-				rand_particle = Particle(x = x, y = y, theta =  theta)
-				self.particle_cloud.append(rand_particle)
+
+			x = unoccupied_cells[random_pt_index][0] * res
+			y = unoccupied_cells[random_pt_index][1] * res
+			theta = random.uniform(0,2*math.pi)
+
+			rand_particle = Particle(x = x, y = y, theta =  theta)
+			self.particle_cloud.append(rand_particle)
 		else:
 			print "guess given"
 			print xy_theta
