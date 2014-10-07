@@ -269,20 +269,33 @@ class ParticleFilter:
 
 		# TODO: replace boundary filler with meaningful numbers. replace dead_list with implementation to remove particles.
 
+		delta = (1,0,0)
+
+		angle = math.pi - math.pi/2
+		newDeltaX = delta[0]*math.cos(angle) - delta[1]*math.sin(angle)
+		newDeltaY = delta[0]*math.sin(angle) + delta[1]*math.cos(angle)
+		print (newDeltaX,newDeltaY,math.pi/2)
+
+
+
 		#David - update particles based on delta, if angle not in arrange adjust
-		x_max_boundary = 10000
-		x_min_boundary = -10000
-		y_max_boundary = 10000
-		y_min_boundary = -10000
+
+		# assumes map centered at 0,0
+		x_max_boundary = -self.occupancy_field.origin.position.x
+		x_min_boundary = self.occupancy_field.origin.position.x
+		y_max_boundary = -self.occupancy_field.origin.position.y
+		y_min_boundary = self.occupancy_field.origin.position.y
 		dead_list = []
+
+		tempDelta = rotatePositionChange(old_odom_xy_theta, delta, self.particle_cloud[i])
+
 		for i in range(self.n_particles):
-			self.particle_cloud[i].x += delta[0]
-			self.particle_cloud[i].y += delta[1]
-			self.particle_cloud[i].theta += delta[2]
-			if self.particle_cloud[i].theta > 359:
-				self.particle_cloud[i].theta -= 359
-			elif self.particle_cloud[i].theta < 0:
-				self.particle_cloud[i].theta += 359
+			tempDelta = rotatePositionChange(old_odom_xy_theta, delta, self.particle_cloud[i])
+			self.particle_cloud[i].x += tempDelta[0]
+			self.particle_cloud[i].y += tempDelta[1]
+			self.particle_cloud[i].theta += tempDelta[2]
+			if self.particle_cloud[i].theta > (2*math.pi) or self.particle_cloud[i].theta < 0:
+				self.particle_cloud[i].theta = self.particle_cloud[i].theta%(2*math.pi)
 				#check map boundaries. We eliminate any particles that are no longer within the map boundaries
 			if self.particle_cloud[i].x > x_max_boundary or self.particle_cloud[i].x < x_min_boundary or self.particle_cloud[i].y > y_max_boundary or self.particle_cloud.y < y_min_boundary:
 				dead_list.append(i)
@@ -290,6 +303,12 @@ class ParticleFilter:
 
 
 		# For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
+
+	def rotatePositionChange(old_odom_xy_theta, delta, particle):
+		angle = particle.theta - old_odom_xy_theta[2]
+		newDeltaX = delta[0]*math.cos(angle) - delta[1]*math.sin(angle)
+		newDeltaY = delta[0]*math.sin(angle) + delta[1]*math.cos(angle)
+		return (newDeltaX,newDeltaY,delta[2])
 
 	def map_calc_range(self,x,y,theta):
 		""" Difficulty Level 3: implement a ray tracing likelihood model... Let me know if you are interested """
