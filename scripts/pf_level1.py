@@ -93,6 +93,8 @@ class OccupancyField:
 	def __init__(self, map):
 		print "OccupancyField initializing"
 		self.map = map		# save this for later
+		self.resolution = self.map.info.resolution
+		self.origin = self.map.info.origin #to get ge the x coordinate of the origin write self.origin.position.x
 		# build up a numpy array of the coordinates of each grid cell in the map
 		X = np.zeros((self.map.info.width*self.map.info.height,2))
 
@@ -273,7 +275,7 @@ class ParticleFilter:
 		y_max_boundary = 10000
 		y_min_boundary = -10000
 		dead_list = []
-		for i in range self.n_particles:
+		for i in range(self.n_particles):
 			self.particle_cloud[i].x += delta[0]
 			self.particle_cloud[i].y += delta[1]
 			self.particle_cloud[i].theta += delta[2]
