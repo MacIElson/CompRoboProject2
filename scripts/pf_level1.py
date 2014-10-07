@@ -388,7 +388,7 @@ class ParticleFilter:
 
 		unoccupied_cells = self.occupancy_field.unoccupied_cells
 
-		print unoccupied_cells
+		# print unoccupied_cells
 
 		if xy_theta == None:
 			print "no guess given"
