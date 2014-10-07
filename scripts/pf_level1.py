@@ -457,7 +457,6 @@ class ParticleFilter:
 	def scan_received(self, msg):
 		""" This is the default logic for what to do when processing scan data.  Feel free to modify this, however,
 			I hope it will provide a good guide.  The input msg is an object of type sensor_msgs/LaserScan """
-		print "scan received"
 		if not(self.initialized):
 			# wait for initialization to complete
 			print "not initialized"
@@ -494,12 +493,10 @@ class ParticleFilter:
 
 		try:
 			self.particle_cloud
-			print "hi"
 			if (math.fabs(new_odom_xy_theta[0] - self.current_odom_xy_theta[0]) > self.d_thresh or
 				  math.fabs(new_odom_xy_theta[1] - self.current_odom_xy_theta[1]) > self.d_thresh or
 				  math.fabs(new_odom_xy_theta[2] - self.current_odom_xy_theta[2]) > self.a_thresh):
 				# we have moved far enough to do an update!
-				print "hi2"
 				self.update_particles_with_odom(msg)	# update based on odometry
 				self.update_particles_with_laser(msg)	# update based on laser scan
 				self.update_robot_pose()				# update robot's pose
