@@ -387,14 +387,19 @@ class ParticleFilter:
 		self.particle_cloud = []
 
 		unoccupied_cells = self.occupancy_field.unoccupied_cells
+
 		print unoccupied_cells
 
 		if xy_theta == None:
 			print "no guess given"
-			random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
+
 			res = self.occupancy_field.map.info.resolution
+			print "res: "  + str(res)
+			print "x shift: " + str(self.occupancy_field.origin.position.x)
+			print "y shift: " + str(self.occupancy_field.origin.position.y)
 			
 			for i in range(self.n_particles):
+				random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
 				x = (unoccupied_cells[random_pt_index][0]  + self.occupancy_field.origin.position.x) * res
 				y = (unoccupied_cells[random_pt_index][1]  + self.occupancy_field.origin.position.y) * res
 				theta = random.uniform(0,2*math.pi)
@@ -421,7 +426,8 @@ class ParticleFilter:
 		print "particle cloud initialized"
 
 	def normalize_particles(self):
-		""" Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
+		""" Make sure the particle weights define a valid distribution (i.e. sum to 1.0)"""
+
 		# TODO: implement this
 		numParticles = len(self.particle_cloud)
 		weightArray = np.empty([numParticles, 1])
