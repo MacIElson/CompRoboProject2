@@ -100,6 +100,8 @@ class OccupancyField:
 	def __init__(self, map):
 		print "OccupancyField initializing"
 		self.map = map		# save this for later
+		self.resolution = self.map.info.resolution
+		self.origin = self.map.info.origin #to get ge the x coordinate of the origin write self.origin.position.x
 		# build up a numpy array of the coordinates of each grid cell in the map
 		X = np.zeros((self.map.info.width*self.map.info.height,2))
 
@@ -272,7 +274,28 @@ class ParticleFilter:
 			self.current_odom_xy_theta = new_odom_xy_theta
 			return
 
-		# TODO: modify particles using delta
+		# TODO: replace boundary filler with meaningful numbers. replace dead_list with implementation to remove particles.
+
+		#David - update particles based on delta, if angle not in arrange adjust
+		x_max_boundary = 10000
+		x_min_boundary = -10000
+		y_max_boundary = 10000
+		y_min_boundary = -10000
+		dead_list = []
+		for i in range(self.n_particles):
+			self.particle_cloud[i].x += delta[0]
+			self.particle_cloud[i].y += delta[1]
+			self.particle_cloud[i].theta += delta[2]
+			if self.particle_cloud[i].theta > 359:
+				self.particle_cloud[i].theta -= 359
+			elif self.particle_cloud[i].theta < 0:
+				self.particle_cloud[i].theta += 359
+				#check map boundaries. We eliminate any particles that are no longer within the map boundaries
+			if self.particle_cloud[i].x > x_max_boundary or self.particle_cloud[i].x < x_min_boundary or self.particle_cloud[i].y > y_max_boundary or self.particle_cloud.y < y_min_boundary:
+				dead_list.append(i)
+
+
+
 		# For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
 
 	def map_calc_range(self,x,y,theta):
