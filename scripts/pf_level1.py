@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+'''
+To run code: roslaunch comp_robo_project2 test_comp_robo_project2.launch map_file:=`rospack find comp_robo_project2`/maps/playground.yaml use_sim_time:=true
+
+To run simulator: roslaunch neato_simulator neato_tb_playground.launch 
+
+'''
+
 import rospy
 
 from std_msgs.msg import Header, String
@@ -363,13 +370,14 @@ class ParticleFilter:
 			print "no guess given"
 			random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
 			res = self.occupancy_field.map.info.resolution
+			
+			for i in range(self.n_particles):
+				x = (unoccupied_cells[random_pt_index][0]  + self.occupancy_field.origin.position.x) * res
+				y = (unoccupied_cells[random_pt_index][1]  + self.occupancy_field.origin.position.y) * res
+				theta = random.uniform(0,2*math.pi)
 
-			x = unoccupied_cells[random_pt_index][0] * res
-			y = unoccupied_cells[random_pt_index][1] * res
-			theta = random.uniform(0,2*math.pi)
-
-			rand_particle = Particle(x = x, y = y, theta =  theta)
-			self.particle_cloud.append(rand_particle)
+				rand_particle = Particle(x = x, y = y, theta =  theta)
+				self.particle_cloud.append(rand_particle)
 		else:
 			print "guess given"
 			print xy_theta
@@ -379,6 +387,8 @@ class ParticleFilter:
 				theta = (random.gauss(xy_theta[2], 1.5))
 				rand_particle = Particle(x = x, y = y, theta =  theta)
 				self.particle_cloud.append(rand_particle)
+
+		print "lenght of initialized particle cloud: " + str(len(self.particle_cloud))
 
 		# Get map characteristics to generate points randomly in that realm. Assume
 		# TODO create particles
@@ -410,7 +420,7 @@ class ParticleFilter:
 	def scan_received(self, msg):
 		""" This is the default logic for what to do when processing scan data.  Feel free to modify this, however,
 			I hope it will provide a good guide.  The input msg is an object of type sensor_msgs/LaserScan """
-		print "scan received"
+		# print "scan received"
 		if not(self.initialized):
 			# wait for initialization to complete
 			print "not initialized"
