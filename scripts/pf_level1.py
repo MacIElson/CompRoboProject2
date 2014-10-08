@@ -116,7 +116,7 @@ class OccupancyField:
 				if self.map.data[ind] > 0:
 					total_occupied += 1
 				elif self.map.data[ind] == 0:
-					self.unoccupied_cells.append([i,j])
+					self.unoccupied_cells.append([float(i),float(j)])
 				X[curr,0] = float(i)
 				X[curr,1] = float(j)
 				curr += 1
@@ -133,6 +133,7 @@ class OccupancyField:
 					O[curr,1] = float(j)
 					curr += 1
 
+					
 		# use super fast scikit learn nearest neighbor algorithm
 		nbrs = NearestNeighbors(n_neighbors=1,algorithm="ball_tree").fit(O)
 		distances, indices = nbrs.kneighbors(X)
@@ -394,7 +395,7 @@ class ParticleFilter:
 
 		unoccupied_cells = self.occupancy_field.unoccupied_cells
 
-		# print unoccupied_cells
+		print unoccupied_cells
 
 		if xy_theta == None:
 			print "no guess given"
