@@ -208,7 +208,7 @@ class ParticleFilter:
 		# Setup pubs and subs
 
 		# pose_listener responds to selection of a new approximate robot location (for instance using rviz)
-		self.pose_listener = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.update_initial_pose)
+		# self.pose_listener = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.update_initial_pose)
 		# publish the current particle cloud.  This enables viewing particles in rviz.
 		self.particle_pub = rospy.Publisher("particlecloud", PoseArray)
 
@@ -285,22 +285,20 @@ class ParticleFilter:
 		y_min_boundary = self.occupancy_field.origin.position.y
 		dead_list = []
 
-		tempDelta = rotatePositionChange(old_odom_xy_theta, delta, self.particle_cloud[i])
-
-		for i in range(self.n_particles):
-			tempDelta = rotatePositionChange(old_odom_xy_theta, delta, self.particle_cloud[i])
+		for i in range(len(self.particle_cloud)):
+			tempDelta = self.rotatePositionChange(old_odom_xy_theta, delta, self.particle_cloud[i])
 			self.particle_cloud[i].x += tempDelta[0]
 			self.particle_cloud[i].y += tempDelta[1]
 			self.particle_cloud[i].theta += tempDelta[2]
 			if self.particle_cloud[i].theta > (2*math.pi) or self.particle_cloud[i].theta < 0:
 				self.particle_cloud[i].theta = self.particle_cloud[i].theta%(2*math.pi)
 				#check map boundaries. We eliminate any particles that are no longer within the map boundaries
-			if self.particle_cloud[i].x > x_max_boundary or self.particle_cloud[i].x < x_min_boundary or self.particle_cloud[i].y > y_max_boundary or self.particle_cloud.y < y_min_boundary:
+			if self.particle_cloud[i].x > x_max_boundary or self.particle_cloud[i].x < x_min_boundary or self.particle_cloud[i].y > y_max_boundary or self.particle_cloud[i].y < y_min_boundary:
 				dead_list.append(i)
 
 		# For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
 
-	def rotatePositionChange(old_odom_xy_theta, delta, particle):
+	def rotatePositionChange(self,old_odom_xy_theta, delta, particle):
 		angle = particle.theta - old_odom_xy_theta[2]
 		newDeltaX = delta[0]*math.cos(angle) - delta[1]*math.sin(angle)
 		newDeltaY = delta[0]*math.sin(angle) + delta[1]*math.cos(angle)
@@ -408,8 +406,8 @@ class ParticleFilter:
 			
 			for i in range(self.n_particles):
 				random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
-				x = (unoccupied_cells[random_pt_index][0]  + self.occupancy_field.origin.position.x) * res
-				y = (unoccupied_cells[random_pt_index][1]  + self.occupancy_field.origin.position.y) * res
+				x = (unoccupied_cells[random_pt_index][0] ) * res + self.occupancy_field.origin.position.x
+				y = (unoccupied_cells[random_pt_index][1] ) * res + self.occupancy_field.origin.position.y
 				theta = random.uniform(0,2*math.pi)
 
 				rand_particle = Particle(x = x, y = y, theta =  theta)
@@ -457,6 +455,7 @@ class ParticleFilter:
 	def scan_received(self, msg):
 		""" This is the default logic for what to do when processing scan data.  Feel free to modify this, however,
 			I hope it will provide a good guide.  The input msg is an object of type sensor_msgs/LaserScan """
+		#print "scan received"
 		if not(self.initialized):
 			# wait for initialization to complete
 			print "not initialized"
@@ -493,15 +492,7 @@ class ParticleFilter:
 
 		try:
 			self.particle_cloud
-			if (math.fabs(new_odom_xy_theta[0] - self.current_odom_xy_theta[0]) > self.d_thresh or
-				  math.fabs(new_odom_xy_theta[1] - self.current_odom_xy_theta[1]) > self.d_thresh or
-				  math.fabs(new_odom_xy_theta[2] - self.current_odom_xy_theta[2]) > self.a_thresh):
-				# we have moved far enough to do an update!
-				self.update_particles_with_odom(msg)	# update based on odometry
-				self.update_particles_with_laser(msg)	# update based on laser scan
-				self.update_robot_pose()				# update robot's pose
-				self.resample_particles()				# resample particles to focus on areas of high density
-				self.fix_map_to_odom_transform(msg)		# update map to odom transform now that we have new particles
+
 		except:
 			# now that we have all of the necessary transforms we can update the particle cloud
 			self.initialize_particle_cloud()
@@ -509,6 +500,17 @@ class ParticleFilter:
 			self.current_odom_xy_theta = new_odom_xy_theta
 			# update our map to odom transform now that the particles are initialized
 			self.fix_map_to_odom_transform(msg)
+
+		if (math.fabs(new_odom_xy_theta[0] - self.current_odom_xy_theta[0]) > self.d_thresh or
+			  math.fabs(new_odom_xy_theta[1] - self.current_odom_xy_theta[1]) > self.d_thresh or
+			  math.fabs(new_odom_xy_theta[2] - self.current_odom_xy_theta[2]) > self.a_thresh):
+			# we have moved far enough to do an update!
+			self.update_particles_with_odom(msg)	# update based on odometry
+			self.update_particles_with_laser(msg)	# update based on laser scan
+			self.update_robot_pose()				# update robot's pose
+			self.resample_particles()				# resample particles to focus on areas of high density
+			self.fix_map_to_odom_transform(msg)		# update map to odom transform now that we have new particles
+
 
 		# publish particles (so things like rviz can see them)
 		self.publish_particles(msg)
