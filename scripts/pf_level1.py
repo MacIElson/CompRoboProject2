@@ -21,6 +21,7 @@ from tf import TransformListener
 from tf import TransformBroadcaster
 from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
 from random import gauss
+from copy import deepcopy
 
 import math
 import time
@@ -253,11 +254,18 @@ class ParticleFilter:
 				(2): compute the most likely pose (i.e. the mode of the distribution) (level 1)
 		"""
 		# first make sure that the particle weights are normalized
+		highestWeight = 0
+		highestIndex = 0
 		self.normalize_particles()
+		for i in range(len(self.particle_cloud)):
+			if self.particle_cloud[i].w > highestWeight:
+				highestWeight = self.particle_cloud[i].w
+				highestIndex = i
+
 
 		# TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
 		# just to get started we will fix the robot's pose to always be at the origin
-		self.robot_pose = Pose()
+		self.robot_pose = self.particle_cloud[i].as_pose()
 
 	def update_particles_with_odom(self, msg):
 		""" Update the particles using the newly given odometry pose.
@@ -319,6 +327,24 @@ class ParticleFilter:
 			function draw_random_sample.
 		"""
 		# make sure the distribution is normalized
+
+		choices = []
+		probabilities = []
+
+		for particle in self.particle_cloud:
+			choices.append(particle)
+			probabilities.append(particle.w)
+
+		# print choices
+		# print probabilities
+
+		numParticles = len(self.particle_cloud)
+		self.particle_cloud = self.draw_random_sample(choices, probabilities, numParticles)
+		for particle in self.particle_cloud:
+			particle.x  = particle.x + random.gauss(0, .3)
+			particle.y  = particle.y + random.gauss(0, .3)
+			particle.theta  = particle.theta + random.gauss(0, 1)
+		#print self.particle_cloud
 		self.normalize_particles()
 		# TODO: fill out the rest of the implementation
 
@@ -340,7 +366,10 @@ class ParticleFilter:
 				scanPosition = self.shiftScanToPoint(angleDif, datum, particle)
 				dist = self.occupancy_field.get_closest_obstacle_distance(scanPosition[0],scanPosition[1])
 				errorList.append(math.pow(dist, 3))
-			particle.w = sum(errorList)/len(errorList)
+
+			print "before: " + str(particle.w)
+			particle.w = (sum(errorList)/len(errorList))
+			print "after: " + str(particle.w)
 
 	def shiftScanToPoint(self,angleDif, datum, particle):
 		#calculate real world position of datum
@@ -468,8 +497,10 @@ class ParticleFilter:
 			weightArray[i]=self.particle_cloud[i].w
 		print "Sum of initial weights" + str(np.sum(weightArray))
 		normWeights = weightArray/np.sum(weightArray)
+		#rint "normWeights: " + str(normWeights)
 		for i in range(numParticles):
-			self.particle_cloud[i].w = normWeights[i]
+			self.particle_cloud[i].w = normWeights[i][0]
+			#print "normAfter: " + str(self.particle_cloud[i].w)
 		print "Sum of normalized weights" + str(np.sum(normWeights))
 
 	def publish_particles(self, msg):
