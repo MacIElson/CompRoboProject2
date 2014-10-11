@@ -215,6 +215,7 @@ class ParticleFilter:
 		# self.pose_listener = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.update_initial_pose)
 		# publish the current particle cloud.  This enables viewing particles in rviz.
 		self.particle_pub = rospy.Publisher("particlecloud", PoseArray)
+		self.pose_pub = rospy.Publisher("predictedPose", PoseArray)
 
 		# laser_subscriber listens for data from the lidar
 		self.laser_subscriber = rospy.Subscriber(self.scan_topic, LaserScan, self.scan_received)
@@ -341,9 +342,9 @@ class ParticleFilter:
 		numParticles = len(self.particle_cloud)
 		self.particle_cloud = self.draw_random_sample(choices, probabilities, numParticles)
 		for particle in self.particle_cloud:
-			particle.x  = particle.x + random.gauss(0, .3)
-			particle.y  = particle.y + random.gauss(0, .3)
-			particle.theta  = particle.theta + random.gauss(0, 1)
+			particle.x  = particle.x + random.gauss(0, .15)
+			particle.y  = particle.y + random.gauss(0, .15)
+			particle.theta  = particle.theta + random.gauss(0, .5)
 		#print self.particle_cloud
 		self.normalize_particles()
 		# TODO: fill out the rest of the implementation
@@ -354,7 +355,7 @@ class ParticleFilter:
 		scanList = []
 		# create list of valid scans
 		for i in range(len(msg.ranges)):
-			if msg.ranges[i] < 6 or msg.ranges[i] >.2:
+			if msg.ranges[i] < 6 and msg.ranges[i] >.2:
 				scanList.append((((i/360)*2*math.pi),msg.ranges[i]))
 
 		# iterate through all particles
@@ -365,15 +366,13 @@ class ParticleFilter:
 			for datum in scanList:
 				scanPosition = self.shiftScanToPoint(angleDif, datum, particle)
 				dist = self.occupancy_field.get_closest_obstacle_distance(scanPosition[0],scanPosition[1])
-				errorList.append(math.pow(dist, 3))
+				errorList.append(math.pow(dist, 1))
 
-			print "before: " + str(particle.w)
-			particle.w = (sum(errorList)/len(errorList))
-			print "after: " + str(particle.w)
+			particle.w = 1/(sum(errorList)/len(errorList))
 
 	def shiftScanToPoint(self,angleDif, datum, particle):
 		#calculate real world position of datum
-		laserAngle = (datum[0]+angleDif +2*math.pi)%(2*math.pi)
+		laserAngle = (datum[0]+angleDif + 2*math.pi)%(2*math.pi)
 		xDelta = datum[1]*math.cos(laserAngle)
 		yDelta = datum[1]*math.sin(laserAngle)
 		datumX = xDelta + particle.x
@@ -503,6 +502,10 @@ class ParticleFilter:
 			#print "normAfter: " + str(self.particle_cloud[i].w)
 		print "Sum of normalized weights" + str(np.sum(normWeights))
 
+	def publish_predicted_pose(self, msg):
+		# actually send the message so that we can view it in rviz
+		self.pose_pub.publish(PoseArray(header=Header(stamp=rospy.Time.now(),frame_id=self.map_frame),poses=[self.robot_pose]))
+
 	def publish_particles(self, msg):
 		particles_conv = []
 		for p in self.particle_cloud:
@@ -572,6 +575,7 @@ class ParticleFilter:
 
 		# publish particles (so things like rviz can see them)
 		self.publish_particles(msg)
+		self.publish_predicted_pose(msg)
 
 	def fix_map_to_odom_transform(self, msg):
 		""" Super tricky code to properly update map to odom transform... do not modify this... Difficulty level infinity. """
