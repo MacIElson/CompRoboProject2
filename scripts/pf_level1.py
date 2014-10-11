@@ -3,6 +3,8 @@
 '''
 To run code: roslaunch comp_robo_project2 test_comp_robo_project2.launch map_file:=`rospack find comp_robo_project2`/maps/playground.yaml use_sim_time:=true
 
+To run code (small playground): roslaunch comp_robo_project2 test_comp_robo_project2.launch map_file:=`rospack find comp_robo_project2`/maps/playground_smaller.yaml use_sim_time:=true
+
 To run simulator: roslaunch neato_simulator neato_tb_playground.launch 
 
 '''
@@ -149,7 +151,7 @@ class OccupancyField:
 		print "OccupancyField initialized"
 
 	def get_closest_obstacle_distance(self,x,y):
-		""" Compute the closest obstacle to the specified (x,y) coordinate in the map.  If the (x,y) coordinate
+		""" (x,y) is in meters. Compute the closest obstacle to the specified (x,y) coordinate in the map.  If the (x,y) coordinate
 			is out of the map boundaries, nan will be returned. """
 		x_coord = int((x - self.map.info.origin.position.x)/self.map.info.resolution)
 		y_coord = int((y - self.map.info.origin.position.y)/self.map.info.resolution)
@@ -323,7 +325,31 @@ class ParticleFilter:
 	def update_particles_with_laser(self, msg):
 		""" Updates the particle weights in response to the scan contained in the msg """
 		# TODO: implement this
-		pass
+		scanList = []
+		# create list of valid scans
+		for i in range(len(msg.ranges)):
+			if msg.ranges[i] < 6 or msg.ranges[i] >.2:
+				scanList.append((((i/360)*2*math.pi),msg.ranges[i]))
+
+		# iterate through all particles
+		for particle in self.particle_cloud:
+			angleDif = (particle.theta - self.robot_pose.orientation.z+2*math.pi)%(2*math.pi)
+			#iterate through all valid scan points
+			errorList = []
+			for datum in scanList:
+				scanPosition = self.shiftScanToPoint(angleDif, datum, particle)
+				dist = self.occupancy_field.get_closest_obstacle_distance(scanPosition[0],scanPosition[1])
+				errorList.append(math.pow(dist, 3))
+			particle.w = sum(errorList)/len(errorList)
+
+	def shiftScanToPoint(self,angleDif, datum, particle):
+		#calculate real world position of datum
+		laserAngle = (datum[0]+angleDif +2*math.pi)%(2*math.pi)
+		xDelta = datum[1]*math.cos(laserAngle)
+		yDelta = datum[1]*math.sin(laserAngle)
+		datumX = xDelta + particle.x
+		datumY = yDelta + particle.y
+		return (datumX,datumY)
 
 	@staticmethod
 	def angle_normalize(z):
@@ -373,7 +399,7 @@ class ParticleFilter:
 		inds = values[np.digitize(random_sample(n), bins)]
 		samples = []
 		for i in inds:
-			samples.append(choices[int(i)])
+			samples.append(deepcopy(choices[int(i)]))
 		return samples
 
 	def update_initial_pose(self, msg):
@@ -395,7 +421,7 @@ class ParticleFilter:
 
 		unoccupied_cells = self.occupancy_field.unoccupied_cells
 
-		print unoccupied_cells
+		#print unoccupied_cells
 
 		if xy_theta == None:
 			print "no guess given"
@@ -415,7 +441,7 @@ class ParticleFilter:
 				self.particle_cloud.append(rand_particle)
 		else:
 			print "guess given"
-			print xy_theta
+			#print xy_theta
 			for i in range(self.n_particles):
 				x = random.gauss(xy_theta[0], 1)
 				y = random.gauss(xy_theta[1], 1)
@@ -423,7 +449,7 @@ class ParticleFilter:
 				rand_particle = Particle(x = x, y = y, theta =  theta)
 				self.particle_cloud.append(rand_particle)
 
-		print "lenght of initialized particle cloud: " + str(len(self.particle_cloud))
+		#print "lenght of initialized particle cloud: " + str(len(self.particle_cloud))
 
 		# Get map characteristics to generate points randomly in that realm. Assume
 		# TODO create particles
