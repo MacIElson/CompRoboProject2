@@ -3,6 +3,9 @@
 '''
 To run code: roslaunch comp_robo_project2 test_comp_robo_project2.launch map_file:=`rospack find comp_robo_project2`/maps/playground.yaml use_sim_time:=true
 
+To run rviz: roslaunch turtlebot_rviz_launchers view_navigation.launch
+
+To run tele_op: rosrun teleop_twist_keyboard teleop_twist_keyboard.py
 To run code (small playground): roslaunch comp_robo_project2 test_comp_robo_project2.launch map_file:=`rospack find comp_robo_project2`/maps/playground_smaller.yaml use_sim_time:=true
 
 To run simulator: roslaunch neato_simulator neato_tb_playground.launch 
@@ -305,11 +308,22 @@ class ParticleFilter:
 			self.particle_cloud[i].theta += tempDelta[2]
 			if self.particle_cloud[i].theta > (2*math.pi) or self.particle_cloud[i].theta < 0:
 				self.particle_cloud[i].theta = self.particle_cloud[i].theta%(2*math.pi)
-				#check map boundaries. We eliminate any particles that are no longer within the map boundaries
-			if self.particle_cloud[i].x > x_max_boundary or self.particle_cloud[i].x < x_min_boundary or self.particle_cloud[i].y > y_max_boundary or self.particle_cloud[i].y < y_min_boundary:
-				dead_list.append(i)
 
-		# For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
+			#check map boundaries. Any particles no longer within map boundaries are moved to boundary
+			if self.particle_cloud[i].x > x_max_boundary:
+				self.particle_cloud[i].x = x_max_boundary
+				dead_list.append[i]
+			elif self.particle_cloud[i].x < x_min_boundary:
+				self.particle_cloud[i].x = x_min_boundary
+				dead_list.append[i]
+			if self.particle_cloud[i].y > y_max_boundary: 
+				self.particle_cloud[i].y = y_max_boundary
+				dead_list.append[i]
+			elif self.particle_cloud[i].y < y_min_boundary:
+				self.particle_cloud[i].y = y_min_boundary
+				dead_list.append[i]
+
+		# For added difficulty: Implement sample_motion_odometry (Prob Rob p 136).
 
 	def rotatePositionChange(self,old_odom_xy_theta, delta, particle):
 		angle = particle.theta - old_odom_xy_theta[2]
@@ -328,6 +342,7 @@ class ParticleFilter:
 			particle is selected in the resampling step.  You may want to make use of the given helper
 			function draw_random_sample.
 		"""
+		weights = []
 		# make sure the distribution is normalized
 
 		choices = []
@@ -348,7 +363,13 @@ class ParticleFilter:
 			particle.theta  = particle.theta + random.gauss(0, .2)
 		#print self.particle_cloud
 		self.normalize_particles()
+		length = len(self.particle_cloud)
 		# TODO: fill out the rest of the implementation
+		for i in range(length):
+			weights.append(self.particle_cloud[i].w[0])
+		print weights
+
+		self.particle_cloud = ParticleFilter.draw_random_sample(self.particle_cloud, weights, length)
 
 	def update_particles_with_laser(self, msg):
 		""" Updates the particle weights in response to the scan contained in the msg """
