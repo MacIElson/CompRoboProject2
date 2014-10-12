@@ -203,7 +203,7 @@ class ParticleFilter:
 		self.odom_frame = "odom"		# the name of the odometry coordinate frame
 		self.scan_topic = "scan"		# the topic where we will get laser scans from 
 
-		self.n_particles = 300			# the number of paporticles to use
+		self.n_particles = 1000			# the number of paporticles to use
 
 		self.d_thresh = 0.2				# the amount of linear movement before performing an update
 		self.a_thresh = math.pi/6		# the amount of angular movement before performing an update
@@ -219,6 +219,7 @@ class ParticleFilter:
 		# publish the current particle cloud.  This enables viewing particles in rviz.
 		self.particle_pub = rospy.Publisher("particlecloud", PoseArray)
 		self.pose_pub = rospy.Publisher("predictedPose", PoseArray)
+		self.scan_shift_pub = rospy.Publisher("scanShift", PoseArray)
 
 		# laser_subscriber listens for data from the lidar
 		self.laser_subscriber = rospy.Subscriber(self.scan_topic, LaserScan, self.scan_received)
@@ -357,9 +358,9 @@ class ParticleFilter:
 		numParticles = len(self.particle_cloud)
 		self.particle_cloud = self.draw_random_sample(choices, probabilities, numParticles)
 		for particle in self.particle_cloud:
-			particle.x  = particle.x + random.gauss(0, .15)
-			particle.y  = particle.y + random.gauss(0, .15)
-			particle.theta  = particle.theta + random.gauss(0, .5)
+			particle.x  = particle.x + random.gauss(0, .1)
+			particle.y  = particle.y + random.gauss(0, .1)
+			particle.theta  = particle.theta + random.gauss(0, .2)
 		#print self.particle_cloud
 		self.normalize_particles()
 		length = len(self.particle_cloud)
@@ -374,10 +375,12 @@ class ParticleFilter:
 		""" Updates the particle weights in response to the scan contained in the msg """
 		# TODO: implement this
 		scanList = []
+		pointList = []
 		# create list of valid scans
 		for i in range(len(msg.ranges)):
 			if msg.ranges[i] < 6 and msg.ranges[i] >.2:
-				scanList.append((((i/360)*2*math.pi),msg.ranges[i]))
+				print ((float(i)/360.0)*2*math.pi)
+				scanList.append((((float(i)/360.0)*2*math.pi),msg.ranges[i]))
 
 		# iterate through all particles
 		for particle in self.particle_cloud:
@@ -386,10 +389,23 @@ class ParticleFilter:
 			errorList = []
 			for datum in scanList:
 				scanPosition = self.shiftScanToPoint(angleDif, datum, particle)
+				#print scanPosition
+				pointList.append(scanPosition)
 				dist = self.occupancy_field.get_closest_obstacle_distance(scanPosition[0],scanPosition[1])
-				errorList.append(math.pow(dist, 1))
+				errorList.append(math.pow(dist, 3))
 
-			particle.w = 1/(sum(errorList)/len(errorList))
+			particle.w = (sum(errorList)/len(errorList))
+
+		self.normalize_particles()
+
+		for particle in self.particle_cloud:
+			weight = particle.w
+			particle.w = 1.0-weight
+
+		self.normalize_particles()
+
+		#self.publish_shifted_scan(msg, pointList)
+
 
 	def shiftScanToPoint(self,angleDif, datum, particle):
 		#calculate real world position of datum
@@ -534,6 +550,13 @@ class ParticleFilter:
 		# actually send the message so that we can view it in rviz
 		self.particle_pub.publish(PoseArray(header=Header(stamp=rospy.Time.now(),frame_id=self.map_frame),poses=particles_conv))
 
+	def publish_shifted_scan(self, msg, pointList):
+		particles_conv = []
+		for point in pointList:
+			particles_conv.append(Pose(position=Point(x=point[0],y=point[1],z=0), orientation=Quaternion(x=0, y=0, z=0, w=0)))
+		# actually send the message so that we can view it in rviz
+		self.scan_shift_pub.publish(PoseArray(header=Header(stamp=rospy.Time.now(),frame_id=self.map_frame),poses=particles_conv))
+
 	def scan_received(self, msg):
 		""" This is the default logic for what to do when processing scan data.  Feel free to modify this, however,
 			I hope it will provide a good guide.  The input msg is an object of type sensor_msgs/LaserScan """
@@ -589,13 +612,14 @@ class ParticleFilter:
 			# we have moved far enough to do an update!
 			self.update_particles_with_odom(msg)	# update based on odometry
 			self.update_particles_with_laser(msg)	# update based on laser scan
-			self.update_robot_pose()				# update robot's pose
+			self.update_robot_pose()
+			self.publish_particles(msg)				# update robot's pose
 			self.resample_particles()				# resample particles to focus on areas of high density
 			self.fix_map_to_odom_transform(msg)		# update map to odom transform now that we have new particles
 
 
 		# publish particles (so things like rviz can see them)
-		self.publish_particles(msg)
+		#self.publish_particles(msg)
 		self.publish_predicted_pose(msg)
 
 	def fix_map_to_odom_transform(self, msg):
