@@ -200,7 +200,7 @@ class ParticleFilter:
 		self.odom_frame = "odom"		# the name of the odometry coordinate frame
 		self.scan_topic = "scan"		# the topic where we will get laser scans from 
 
-		self.n_particles = 1000			# the number of paporticles to use
+		self.n_particles = 300			# the number of paporticles to use
 
 		self.d_thresh = 0.2				# the amount of linear movement before performing an update
 		self.a_thresh = math.pi/6		# the amount of angular movement before performing an update
@@ -379,7 +379,8 @@ class ParticleFilter:
 
 		for particle in self.particle_cloud:
 			weight = particle.w
-			particle.w = 1.0-weight
+			particle.w = weight
+			print "weight: " + str(particle.w)
 
 		self.normalize_particles()
 
