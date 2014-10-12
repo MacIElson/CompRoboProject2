@@ -3,11 +3,12 @@
 '''
 To run code: roslaunch comp_robo_project2 test_comp_robo_project2.launch map_file:=`rospack find comp_robo_project2`/maps/playground.yaml use_sim_time:=true
 
-To run simulator: roslaunch neato_simulator neato_tb_playground.launch
-
 To run rviz: roslaunch turtlebot_rviz_launchers view_navigation.launch
 
 To run tele_op: rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+To run code (small playground): roslaunch comp_robo_project2 test_comp_robo_project2.launch map_file:=`rospack find comp_robo_project2`/maps/playground_smaller.yaml use_sim_time:=true
+
+To run simulator: roslaunch neato_simulator neato_tb_playground.launch 
 
 '''
 
@@ -23,6 +24,7 @@ from tf import TransformListener
 from tf import TransformBroadcaster
 from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
 from random import gauss
+from copy import deepcopy
 
 import math
 import time
@@ -153,7 +155,7 @@ class OccupancyField:
 		print "OccupancyField initialized"
 
 	def get_closest_obstacle_distance(self,x,y):
-		""" Compute the closest obstacle to the specified (x,y) coordinate in the map.  If the (x,y) coordinate
+		""" (x,y) is in meters. Compute the closest obstacle to the specified (x,y) coordinate in the map.  If the (x,y) coordinate
 			is out of the map boundaries, nan will be returned. """
 		x_coord = int((x - self.map.info.origin.position.x)/self.map.info.resolution)
 		y_coord = int((y - self.map.info.origin.position.y)/self.map.info.resolution)
@@ -216,6 +218,7 @@ class ParticleFilter:
 		# self.pose_listener = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.update_initial_pose)
 		# publish the current particle cloud.  This enables viewing particles in rviz.
 		self.particle_pub = rospy.Publisher("particlecloud", PoseArray)
+		self.pose_pub = rospy.Publisher("predictedPose", PoseArray)
 
 		# laser_subscriber listens for data from the lidar
 		self.laser_subscriber = rospy.Subscriber(self.scan_topic, LaserScan, self.scan_received)
@@ -255,11 +258,18 @@ class ParticleFilter:
 				(2): compute the most likely pose (i.e. the mode of the distribution) (level 1)
 		"""
 		# first make sure that the particle weights are normalized
+		highestWeight = 0
+		highestIndex = 0
 		self.normalize_particles()
+		for i in range(len(self.particle_cloud)):
+			if self.particle_cloud[i].w > highestWeight:
+				highestWeight = self.particle_cloud[i].w
+				highestIndex = i
+
 
 		# TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
 		# just to get started we will fix the robot's pose to always be at the origin
-		self.robot_pose = Pose()
+		self.robot_pose = self.particle_cloud[i].as_pose()
 
 	def update_particles_with_odom(self, msg):
 		""" Update the particles using the newly given odometry pose.
@@ -333,6 +343,24 @@ class ParticleFilter:
 		"""
 		weights = []
 		# make sure the distribution is normalized
+
+		choices = []
+		probabilities = []
+
+		for particle in self.particle_cloud:
+			choices.append(particle)
+			probabilities.append(particle.w)
+
+		# print choices
+		# print probabilities
+
+		numParticles = len(self.particle_cloud)
+		self.particle_cloud = self.draw_random_sample(choices, probabilities, numParticles)
+		for particle in self.particle_cloud:
+			particle.x  = particle.x + random.gauss(0, .15)
+			particle.y  = particle.y + random.gauss(0, .15)
+			particle.theta  = particle.theta + random.gauss(0, .5)
+		#print self.particle_cloud
 		self.normalize_particles()
 		length = len(self.particle_cloud)
 		# TODO: fill out the rest of the implementation
@@ -345,7 +373,32 @@ class ParticleFilter:
 	def update_particles_with_laser(self, msg):
 		""" Updates the particle weights in response to the scan contained in the msg """
 		# TODO: implement this
-		pass
+		scanList = []
+		# create list of valid scans
+		for i in range(len(msg.ranges)):
+			if msg.ranges[i] < 6 and msg.ranges[i] >.2:
+				scanList.append((((i/360)*2*math.pi),msg.ranges[i]))
+
+		# iterate through all particles
+		for particle in self.particle_cloud:
+			angleDif = (particle.theta - self.robot_pose.orientation.z+2*math.pi)%(2*math.pi)
+			#iterate through all valid scan points
+			errorList = []
+			for datum in scanList:
+				scanPosition = self.shiftScanToPoint(angleDif, datum, particle)
+				dist = self.occupancy_field.get_closest_obstacle_distance(scanPosition[0],scanPosition[1])
+				errorList.append(math.pow(dist, 1))
+
+			particle.w = 1/(sum(errorList)/len(errorList))
+
+	def shiftScanToPoint(self,angleDif, datum, particle):
+		#calculate real world position of datum
+		laserAngle = (datum[0]+angleDif + 2*math.pi)%(2*math.pi)
+		xDelta = datum[1]*math.cos(laserAngle)
+		yDelta = datum[1]*math.sin(laserAngle)
+		datumX = xDelta + particle.x
+		datumY = yDelta + particle.y
+		return (datumX,datumY)
 
 	@staticmethod
 	def angle_normalize(z):
@@ -395,7 +448,7 @@ class ParticleFilter:
 		inds = values[np.digitize(random_sample(n), bins)]
 		samples = []
 		for i in inds:
-			samples.append(choices[int(i)])
+			samples.append(deepcopy(choices[int(i)]))
 		return samples
 
 	def update_initial_pose(self, msg):
@@ -417,7 +470,7 @@ class ParticleFilter:
 
 		unoccupied_cells = self.occupancy_field.unoccupied_cells
 
-		print unoccupied_cells
+		#print unoccupied_cells
 
 		if xy_theta == None:
 			print "no guess given"
@@ -437,7 +490,7 @@ class ParticleFilter:
 				self.particle_cloud.append(rand_particle)
 		else:
 			print "guess given"
-			print xy_theta
+			#print xy_theta
 			for i in range(self.n_particles):
 				x = random.gauss(xy_theta[0], 1)
 				y = random.gauss(xy_theta[1], 1)
@@ -445,7 +498,7 @@ class ParticleFilter:
 				rand_particle = Particle(x = x, y = y, theta =  theta)
 				self.particle_cloud.append(rand_particle)
 
-		print "lenght of initialized particle cloud: " + str(len(self.particle_cloud))
+		#print "lenght of initialized particle cloud: " + str(len(self.particle_cloud))
 
 		# Get map characteristics to generate points randomly in that realm. Assume
 		# TODO create particles
@@ -464,9 +517,15 @@ class ParticleFilter:
 			weightArray[i]=self.particle_cloud[i].w
 		print "Sum of initial weights" + str(np.sum(weightArray))
 		normWeights = weightArray/np.sum(weightArray)
+		#rint "normWeights: " + str(normWeights)
 		for i in range(numParticles):
-			self.particle_cloud[i].w = normWeights[i]
+			self.particle_cloud[i].w = normWeights[i][0]
+			#print "normAfter: " + str(self.particle_cloud[i].w)
 		print "Sum of normalized weights" + str(np.sum(normWeights))
+
+	def publish_predicted_pose(self, msg):
+		# actually send the message so that we can view it in rviz
+		self.pose_pub.publish(PoseArray(header=Header(stamp=rospy.Time.now(),frame_id=self.map_frame),poses=[self.robot_pose]))
 
 	def publish_particles(self, msg):
 		particles_conv = []
@@ -537,6 +596,7 @@ class ParticleFilter:
 
 		# publish particles (so things like rviz can see them)
 		self.publish_particles(msg)
+		self.publish_predicted_pose(msg)
 
 	def fix_map_to_odom_transform(self, msg):
 		""" Super tricky code to properly update map to odom transform... do not modify this... Difficulty level infinity. """
