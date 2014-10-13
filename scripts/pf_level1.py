@@ -261,11 +261,13 @@ class ParticleFilter:
 		# first make sure that the particle weights are normalized
 		highestWeight = 0
 		highestIndex = 0
+
 		self.normalize_particles()
 		for i in range(len(self.particle_cloud)):
 			if self.particle_cloud[i].w > highestWeight:
 				highestWeight = self.particle_cloud[i].w
 				highestIndex = i
+		print highestWeight
 
 
 		# TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
@@ -363,13 +365,13 @@ class ParticleFilter:
 			particle.theta  = particle.theta + random.gauss(0, .2)
 		#print self.particle_cloud
 		self.normalize_particles()
-		length = len(self.particle_cloud)
+		#length = len(self.particle_cloud)
 		# TODO: fill out the rest of the implementation
-		for i in range(length):
-			weights.append(self.particle_cloud[i].w[0])
-		print weights
+		#for i in range(length):
+			#weights.append(self.particle_cloud[i].w)
+		#print weights
 
-		self.particle_cloud = ParticleFilter.draw_random_sample(self.particle_cloud, weights, length)
+		#self.particle_cloud = ParticleFilter.draw_random_sample(self.particle_cloud, weights, length)
 
 	def update_particles_with_laser(self, msg):
 		""" Updates the particle weights in response to the scan contained in the msg """
@@ -379,7 +381,6 @@ class ParticleFilter:
 		# create list of valid scans
 		for i in range(len(msg.ranges)):
 			if msg.ranges[i] < 6 and msg.ranges[i] >.2:
-				print ((float(i)/360.0)*2*math.pi)
 				scanList.append((((float(i)/360.0)*2*math.pi),msg.ranges[i]))
 
 		# iterate through all particles
@@ -394,14 +395,22 @@ class ParticleFilter:
 				dist = self.occupancy_field.get_closest_obstacle_distance(scanPosition[0],scanPosition[1])
 				errorList.append(math.pow(dist, 3))
 
-			particle.w = (sum(errorList)/len(errorList))
+			particle.w = 1/(sum(errorList)/len(errorList))
+			print "errorAverage: " + str(particle.w)
 
-		self.normalize_particles()
+		#print "normError: " + str(self.particle_cloud)
 
-		for particle in self.particle_cloud:
-			weight = particle.w
-			particle.w = weight
-			print "weight: " + str(particle.w)
+		# for particle in self.particle_cloud:
+		# 	weight = particle.w
+		# 	particle.w = 1-weight
+			#print "weight: " + str(particle.w)
+
+		weightList = []
+
+		#self.normalize_particles()
+		for i in range(len(self.particle_cloud)):
+			weightList.append(self.particle_cloud[i].w)
+		print weightList
 
 		self.normalize_particles()
 
@@ -493,16 +502,15 @@ class ParticleFilter:
 			print "no guess given"
 
 			res = self.occupancy_field.map.info.resolution
-			print "res: "  + str(res)
-			print "x shift: " + str(self.occupancy_field.origin.position.x)
-			print "y shift: " + str(self.occupancy_field.origin.position.y)
 			
 			for i in range(self.n_particles):
 				random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
 				x = (unoccupied_cells[random_pt_index][0] ) * res + self.occupancy_field.origin.position.x
+				#x = 0.0
 				y = (unoccupied_cells[random_pt_index][1] ) * res + self.occupancy_field.origin.position.y
+				#y = 0.0
 				theta = random.uniform(0,2*math.pi)
-
+				#theta = 0
 				rand_particle = Particle(x = x, y = y, theta =  theta)
 				self.particle_cloud.append(rand_particle)
 		else:
@@ -531,14 +539,17 @@ class ParticleFilter:
 		numParticles = len(self.particle_cloud)
 		weightArray = np.empty([numParticles, 1])
 		for i in range(numParticles):
-			weightArray[i]=self.particle_cloud[i].w
-		print "Sum of initial weights" + str(np.sum(weightArray))
+			print 
+			weightArray[i] = self.particle_cloud[i].w
+		#print "Sum of initial weights" + str(np.sum(weightArray))
+		print "weightArray: " + str(weightArray)
 		normWeights = weightArray/np.sum(weightArray)
+		print "normWeights: " + str(normWeights)
 		#rint "normWeights: " + str(normWeights)
 		for i in range(numParticles):
 			self.particle_cloud[i].w = normWeights[i][0]
 			#print "normAfter: " + str(self.particle_cloud[i].w)
-		print "Sum of normalized weights" + str(np.sum(normWeights))
+		#print "Sum of normalized weights" + str(np.sum(normWeights))
 
 	def publish_predicted_pose(self, msg):
 		# actually send the message so that we can view it in rviz
