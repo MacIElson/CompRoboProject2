@@ -10,6 +10,7 @@ To run code (small playground): roslaunch comp_robo_project2 test_comp_robo_proj
 
 To run simulator: roslaunch neato_simulator neato_tb_playground.launch 
 
+To connect to neato: roslaunch neato_node bringup.launch host:=192.168.17.207
 '''
 
 import rospy
@@ -203,7 +204,7 @@ class ParticleFilter:
 		self.odom_frame = "odom"		# the name of the odometry coordinate frame
 		self.scan_topic = "scan"		# the topic where we will get laser scans from 
 
-		self.n_particles = 300			# the number of paporticles to use
+		self.n_particles = 200			# the number of paporticles to use
 
 		self.d_thresh = 0.2				# the amount of linear movement before performing an update
 		self.a_thresh = math.pi/6		# the amount of angular movement before performing an update
@@ -262,7 +263,7 @@ class ParticleFilter:
 		highestWeight = 0
 		highestIndex = 0
 
-		self.normalize_particles()
+		# self.normalize_particles()
 		for i in range(len(self.particle_cloud)):
 			if self.particle_cloud[i].w > highestWeight:
 				highestWeight = self.particle_cloud[i].w
@@ -301,7 +302,6 @@ class ParticleFilter:
 		x_min_boundary = self.occupancy_field.origin.position.x
 		y_max_boundary = -self.occupancy_field.origin.position.y
 		y_min_boundary = self.occupancy_field.origin.position.y
-		dead_list = []
 
 		for i in range(len(self.particle_cloud)):
 			tempDelta = self.rotatePositionChange(old_odom_xy_theta, delta, self.particle_cloud[i])
@@ -314,16 +314,12 @@ class ParticleFilter:
 			#check map boundaries. Any particles no longer within map boundaries are moved to boundary
 			if self.particle_cloud[i].x > x_max_boundary:
 				self.particle_cloud[i].x = x_max_boundary
-				dead_list.append[i]
 			elif self.particle_cloud[i].x < x_min_boundary:
 				self.particle_cloud[i].x = x_min_boundary
-				dead_list.append[i]
 			if self.particle_cloud[i].y > y_max_boundary: 
 				self.particle_cloud[i].y = y_max_boundary
-				dead_list.append[i]
 			elif self.particle_cloud[i].y < y_min_boundary:
 				self.particle_cloud[i].y = y_min_boundary
-				dead_list.append[i]
 
 		# For added difficulty: Implement sample_motion_odometry (Prob Rob p 136).
 
@@ -364,7 +360,7 @@ class ParticleFilter:
 			particle.y  = particle.y + random.gauss(0, .1)
 			particle.theta  = particle.theta + random.gauss(0, .2)
 		#print self.particle_cloud
-		self.normalize_particles()
+		# self.normalize_particles()
 		#length = len(self.particle_cloud)
 		# TODO: fill out the rest of the implementation
 		#for i in range(length):
@@ -528,7 +524,7 @@ class ParticleFilter:
 		# Get map characteristics to generate points randomly in that realm. Assume
 		# TODO create particles
 		self.particle_pub.publish()
-		self.normalize_particles()
+		# self.normalize_particles()
 		self.update_robot_pose()
 		print "particle cloud initialized"
 
