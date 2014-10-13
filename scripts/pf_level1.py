@@ -23,7 +23,7 @@ from nav_msgs.srv import GetMap
 import tf
 from tf import TransformListener
 from tf import TransformBroadcaster
-from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
+from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix, quaternion_from_euler
 from random import gauss
 from copy import deepcopy
 
@@ -177,7 +177,7 @@ class ParticleFilter:
 		Attributes list:
 			initialized: a Boolean flag to communicate to other class methods that initializaiton is complete
 			base_frame: the name of the robot base coordinate frame (should be "base_link" for most robots)
-			map_frame: the name of the map coordinate frame (should be "map" in most cases)
+			map_frame: the name of the map coordinate frame (should be "map" in most caPose(ses)
 			odom_frame: the name of the odometry coordinate frame (should be "odom" in most cases)
 			scan_topic: the name of the scan topic to listen to (should be "scan" in most cases)
 			n_particles: the number of particles in the filter
@@ -264,16 +264,48 @@ class ParticleFilter:
 		highestIndex = 0
 
 		# self.normalize_particles()
+
+		weightsAndParticles = []
+
 		for i in range(len(self.particle_cloud)):
-			if self.particle_cloud[i].w > highestWeight:
-				highestWeight = self.particle_cloud[i].w
-				highestIndex = i
+			weightsAndParticles.append((self.particle_cloud[i].w,self.particle_cloud[i]))
+	
 		print highestWeight
+
+		sorted_by_first = sorted(weightsAndParticles, key=lambda tup: tup[0])[::-1]
+
+		topParticles = [i[1] for i in sorted_by_first][:int(self.n_particles*.3)]
 
 
 		# TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
 		# just to get started we will fix the robot's pose to always be at the origin
-		self.robot_pose = self.particle_cloud[i].as_pose()
+		self.robot_pose = self.averageHypos(topParticles)
+
+	def averageHypos(self, hypoList):
+		xList = []
+		yList = []
+		thetaList = []
+
+		for particle in hypoList:
+			xList.append(particle.x)
+			yList.append(particle.y)
+			thetaList.append(particle.theta)
+
+		averageX = sum(xList)/len(xList)
+		averageY = sum(yList)/len(yList)
+
+		unitXList = []
+		unitYList = []
+		for theta in thetaList:
+			unitXList.append(math.cos(theta))
+			unitYList.append(math.sin(theta))
+		averageUnitX = sum(unitXList)/len(unitXList)
+		averageUnitY = sum(unitYList)/len(unitYList)
+		averageTheta = (math.atan2(averageUnitY,averageUnitX)+(2*math.pi))%(2*math.pi)
+
+		#print averageAngle 
+
+		return Particle(x=averageX,y=averageY,theta=averageTheta ,w=1.0).as_pose()
 
 	def update_particles_with_odom(self, msg):
 		""" Update the particles using the newly given odometry pose.
@@ -358,7 +390,7 @@ class ParticleFilter:
 		for particle in self.particle_cloud:
 			particle.x  = particle.x + random.gauss(0, .1)
 			particle.y  = particle.y + random.gauss(0, .1)
-			particle.theta  = particle.theta + random.gauss(0, .2)
+			particle.theta  = particle.theta + random.gauss(0, .4)
 		#print self.particle_cloud
 		# self.normalize_particles()
 		#length = len(self.particle_cloud)
