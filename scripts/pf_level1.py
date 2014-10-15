@@ -206,8 +206,8 @@ class ParticleFilter:
 
 		self.n_particles = 200			# the number of paporticles to use
 
-		self.d_thresh = 0.2				# the amount of linear movement before performing an update
-		self.a_thresh = math.pi/6		# the amount of angular movement before performing an update
+		self.d_thresh = 0.1				# the amount of linear movement before performing an update
+		self.a_thresh = math.pi/12		# the amount of angular movement before performing an update
 
 		self.laser_max_distance = 2.0	# maximum penalty to assess in the likelihood field model
 
@@ -385,21 +385,32 @@ class ParticleFilter:
 		# print choices
 		# print probabilities
 
-		numParticles = len(self.particle_cloud)
-		self.particle_cloud = self.draw_random_sample(choices, probabilities, numParticles)
-		for particle in self.particle_cloud:
+		numParticles = int(self.n_particles/3)*2
+		temp_particle_cloud = self.draw_random_sample(choices, probabilities, numParticles)
+		for particle in temp_particle_cloud:
 			particle.x  = particle.x + random.gauss(0, .1)
 			particle.y  = particle.y + random.gauss(0, .1)
 			particle.theta  = particle.theta + random.gauss(0, .4)
-		#print self.particle_cloud
-		# self.normalize_particles()
-		#length = len(self.particle_cloud)
-		# TODO: fill out the rest of the implementation
-		#for i in range(length):
-			#weights.append(self.particle_cloud[i].w)
-		#print weights
 
-		#self.particle_cloud = ParticleFilter.draw_random_sample(self.particle_cloud, weights, length)
+		self.particle_cloud = temp_particle_cloud + self.generateRandomParticles(self.n_particles - numParticles)
+
+
+	def generateRandomParticles(self, number):
+
+		res = self.occupancy_field.map.info.resolution
+		temp_particle_cloud = []
+		unoccupied_cells = self.occupancy_field.unoccupied_cells
+
+		for i in range(number):
+			random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
+			x = (unoccupied_cells[random_pt_index][0] ) * res + self.occupancy_field.origin.position.x
+			y = (unoccupied_cells[random_pt_index][1] ) * res + self.occupancy_field.origin.position.y
+			theta = random.uniform(0,2*math.pi)
+			rand_particle = Particle(x = x, y = y, theta =  theta)
+			temp_particle_cloud.append(rand_particle)
+
+		return temp_particle_cloud
+
 
 	def update_particles_with_laser(self, msg):
 		""" Updates the particle weights in response to the scan contained in the msg """
@@ -534,11 +545,8 @@ class ParticleFilter:
 			for i in range(self.n_particles):
 				random_pt_index = int(random.uniform(0,len(unoccupied_cells)))
 				x = (unoccupied_cells[random_pt_index][0] ) * res + self.occupancy_field.origin.position.x
-				#x = 0.0
 				y = (unoccupied_cells[random_pt_index][1] ) * res + self.occupancy_field.origin.position.y
-				#y = 0.0
 				theta = random.uniform(0,2*math.pi)
-				#theta = 0
 				rand_particle = Particle(x = x, y = y, theta =  theta)
 				self.particle_cloud.append(rand_particle)
 		else:
