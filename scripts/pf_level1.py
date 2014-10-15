@@ -94,13 +94,11 @@ class Particle:
 		orientation_tuple = tf.transformations.quaternion_from_euler(0,0,self.theta)
 		return Pose(position=Point(x=self.x,y=self.y,z=0), orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
-	# TODO: define additional helper functions if needed
-
 class OccupancyField:
 	""" Stores an occupancy field for an input map.  An occupancy field returns the distance to the closest
 		obstacle for any coordinate in the map
 		Attributes:
-			map: the map to localize against (nav_msgs/OccupancyGrid)
+			map: the map to localize against. Known unoccupied cells are white, obstacles are white, and unknown is grey (nav_msgs/OccupancyGrid)
 			closest_occ: the distance for each entry in the OccupancyGrid to the closest obstacle
 	"""
 
@@ -115,14 +113,14 @@ class OccupancyField:
 		# while we're at it let's count the number of occupied cells
 		total_occupied = 0
 		curr = 0
-		self.unoccupied_cells = []
+		self.unoccupied_cells = [] # Array of cells (described by a tuple of indices) that are not inhabited by an obsacle
 		for i in range(self.map.info.width):
 			for j in range(self.map.info.height):
 				# occupancy grids are stored in row major order, if you go through this right, you might be able to use curr
 				ind = i + j*self.map.info.width
 				if self.map.data[ind] > 0:
 					total_occupied += 1
-				elif self.map.data[ind] == 0:
+				elif self.map.data[ind] == 0: # Unoccpied cells are white
 					self.unoccupied_cells.append([float(i),float(j)])
 				X[curr,0] = float(i)
 				X[curr,1] = float(j)
@@ -199,24 +197,22 @@ class ParticleFilter:
 		self.initialized = False		# make sure we don't perform updates before everything is setup
 		rospy.init_node('comp_robo_project2')			# tell roscore that we are creating a new node named "pf"
 
-		self.base_frame = "base_link"	# the frame of the robot base
+		self.base_frame = "base_link"		# the frame of the robot base
 		self.map_frame = "map"			# the name of the map coordinate frame
 		self.odom_frame = "odom"		# the name of the odometry coordinate frame
 		self.scan_topic = "scan"		# the topic where we will get laser scans from 
 
 		self.n_particles = 200			# the number of paporticles to use
 
-		self.d_thresh = 0.2				# the amount of linear movement before performing an update
+		self.d_thresh = 0.2			# the amount of linear movement before performing an update
 		self.a_thresh = math.pi/6		# the amount of angular movement before performing an update
 
 		self.laser_max_distance = 2.0	# maximum penalty to assess in the likelihood field model
 
-		# TODO: define additional constants if needed
-
 		# Setup pubs and subs
 
 		# pose_listener responds to selection of a new approximate robot location (for instance using rviz)
-		# self.pose_listener = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.update_initial_pose)
+		self.pose_listener = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.update_initial_pose)
 		# publish the current particle cloud.  This enables viewing particles in rviz.
 		self.particle_pub = rospy.Publisher("particlecloud", PoseArray)
 		self.pose_pub = rospy.Publisher("predictedPose", PoseArray)
@@ -228,14 +224,6 @@ class ParticleFilter:
 		# enable listening for and broadcasting coordinate transforms
 		self.tf_listener = TransformListener()
 		self.tf_broadcaster = TransformBroadcaster()
-
-		#self.particle_cloud = []
-
-		#self.current_odom_xy_theta = [0,0,0]
-
-		# request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
-		# TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
-		#		into the init method for OccupancyField
 
 		print "waiting for map server"
 		rospy.wait_for_service('static_map')
@@ -259,41 +247,48 @@ class ParticleFilter:
 				(1): compute the mean pose (level 2)
 				(2): compute the most likely pose (i.e. the mode of the distribution) (level 1)
 		"""
-		# first make sure that the particle weights are normalized
 		highestWeight = 0
 		highestIndex = 0
 
-		# self.normalize_particles()
-
-		weightsAndParticles = []
+		weightsAndParticles = [] # array of tuples of the weight of each particle and the particle itself
 
 		for i in range(len(self.particle_cloud)):
 			weightsAndParticles.append((self.particle_cloud[i].w,self.particle_cloud[i]))
-	
-		print highestWeight
 
+		# Order by weights
 		sorted_by_first = sorted(weightsAndParticles, key=lambda tup: tup[0])[::-1]
 
+		# Select the the top third of particles with the hightes weights (probablilities)
 		topParticles = [i[1] for i in sorted_by_first][:int(self.n_particles*.3)]
 
-
-		# TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
-		# just to get started we will fix the robot's pose to always be at the origin
+		# Average the top wighted particles to be the guessed position
 		self.robot_pose = self.averageHypos(topParticles)
 
 	def averageHypos(self, hypoList):
+		""" Averages the positions and angles of the input Particles
+			hypoList must be a list of Particles
+			returns Particle position info
+		"""
 		xList = []
 		yList = []
 		thetaList = []
-
+		
+		if hypoList == [] or hypoList == None:
+			print "hypoList is invalid"
+			return Particle(x=0,y=0,theta=0,w=0).as_pose()
+		
+		# Sort particles' characteristics in appropriate lists
 		for particle in hypoList:
 			xList.append(particle.x)
 			yList.append(particle.y)
 			thetaList.append(particle.theta)
 
+		# Average X and Y positions
 		averageX = sum(xList)/len(xList)
 		averageY = sum(yList)/len(yList)
 
+
+		# Average angles by decomposing vectors, averaging components, and converting back to an angle
 		unitXList = []
 		unitYList = []
 		for theta in thetaList:
@@ -302,8 +297,6 @@ class ParticleFilter:
 		averageUnitX = sum(unitXList)/len(unitXList)
 		averageUnitY = sum(unitYList)/len(unitYList)
 		averageTheta = (math.atan2(averageUnitY,averageUnitX)+(2*math.pi))%(2*math.pi)
-
-		#print averageAngle 
 
 		return Particle(x=averageX,y=averageY,theta=averageTheta ,w=1.0).as_pose()
 
@@ -325,21 +318,20 @@ class ParticleFilter:
 			self.current_odom_xy_theta = new_odom_xy_theta
 			return
 
-		# TODO: replace boundary filler with meaningful numbers. replace dead_list with implementation to remove particles.
-
-		#update particles based on delta, create tempDelta for each particle, if angle not in arrange adjust
-
 		# assumes map centered at 0,0
 		x_max_boundary = -self.occupancy_field.origin.position.x
 		x_min_boundary = self.occupancy_field.origin.position.x
 		y_max_boundary = -self.occupancy_field.origin.position.y
 		y_min_boundary = self.occupancy_field.origin.position.y
 
+		# Loops through particles to upsade with odom information
 		for i in range(len(self.particle_cloud)):
+			# Calculates amount of change for angle and X and Y position
 			tempDelta = self.rotatePositionChange(old_odom_xy_theta, delta, self.particle_cloud[i])
 			self.particle_cloud[i].x += tempDelta[0]
 			self.particle_cloud[i].y += tempDelta[1]
 			self.particle_cloud[i].theta += tempDelta[2]
+			# Accounts for angle wrapping
 			if self.particle_cloud[i].theta > (2*math.pi) or self.particle_cloud[i].theta < 0:
 				self.particle_cloud[i].theta = self.particle_cloud[i].theta%(2*math.pi)
 
@@ -356,6 +348,7 @@ class ParticleFilter:
 		# For added difficulty: Implement sample_motion_odometry (Prob Rob p 136).
 
 	def rotatePositionChange(self,old_odom_xy_theta, delta, particle):
+		""" Determines the change in X and Y for each hypothesis based on its angle """
 		angle = particle.theta - old_odom_xy_theta[2]
 		newDeltaX = delta[0]*math.cos(angle) - delta[1]*math.sin(angle)
 		newDeltaY = delta[0]*math.sin(angle) + delta[1]*math.cos(angle)
@@ -373,20 +366,20 @@ class ParticleFilter:
 			function draw_random_sample.
 		"""
 		weights = []
-		# make sure the distribution is normalized
-
 		choices = []
 		probabilities = []
-
+		
+		# Sort particle cloud info into appropriate arrays
 		for particle in self.particle_cloud:
 			choices.append(particle)
 			probabilities.append(particle.w)
 
-		# print choices
-		# print probabilities
-
 		numParticles = len(self.particle_cloud)
+		
+		# Randomly draw particles from the current particle cloud biased towards points with higher weights
 		self.particle_cloud = self.draw_random_sample(choices, probabilities, numParticles)
+
+		# Add uncertaintly/noise to all points
 		for particle in self.particle_cloud:
 			particle.x  = particle.x + random.gauss(0, .1)
 			particle.y  = particle.y + random.gauss(0, .1)
